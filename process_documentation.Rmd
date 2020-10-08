@@ -1,0 +1,327 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Project structure
+
+An `R project` with `raw_curr` folder where the downloaded curriculum will be stored and `forprocessing` folder where the subset curriculum and .xlsx conversions will be stored
+
+# Download curriculum files
+
+Download the K12 curriculum
+
+```{r}
+#dir.create("raw_curr")
+path <- "C:/Users/shain/Desktop/CURRICULUM_STUDIES/raw_curr/"
+url2<-"https://www.deped.gov.ph/wp-content/uploads/2019/01/Math-CG_with-tagged-math-equipment.pdf"
+destfile2 <- paste0(path, "K12_math_curr.pdf")
+download.file(url2, destfile2, mode="wb")
+
+urlk1 <- "https://www.deped.gov.ph/wp-content/uploads/2019/01/Kinder-CG_0.pdf"
+destfile3 <- paste0(path, "K12K_math_curr.pdf")
+download.file(urlk1, destfile3, mode="wb")
+```
+
+Download the MELC curriculum. Change the path as needed.
+
+```{r}
+url1<-"https://commons.deped.gov.ph/melc_k12"
+destfile1 <- paste0(path, "MELC_math_curr.pdf")
+download.file(url1, destfile1, mode="wb")
+```
+
+
+
+# Extract relevant pages and save
+
+Extract relevant pages: page 9 - 253 of the K12 curriculum.
+
+```{r}
+#dir.create("forprocessing")
+pdftools::pdf_subset("raw_curr/K12_math_curr.pdf", pages=9:253, output="forprocessing/K12_math.pdf")
+pdftools::pdf_subset("raw_curr/K12K_math_curr.pdf", pages=17:21, output="forprocessing/K12K_math.pdf")
+```
+
+Extract relevant pages: page 197 - 240 of the MELC curriculum (only the math part)
+
+```{r}
+pdftools::pdf_subset("raw_curr/MELC_math_curr.pdf", pages=197:240, output="forprocessing/melc_math.pdf")
+```
+
+# Convert to .xlsx file
+
+Go to [PD2GO]("https://www.pdf2go.com/pdf-to-excel")
+
+# Tidying 
+
+This is a scratch
+
+## Curriculum files
+
+Read the data and separately process elementary from jhs curriculum since reading them altogether makes us miss a lot. Maybe the problem is with the formatting
+
+```{r}
+k12<-readxl::read_xlsx("forprocessing/K12_math.xlsx")
+k12_elem<-readxl::read_xlsx("forprocessing/K12_math.xlsx", skip=3, n_max=1102, col_names = TRUE)
+k12_jhs<-readxl::read_xlsx("forprocessing/K12_math.xlsx", skip=1107, col_names = TRUE)
+k12K<-readxl::read_xlsx("forprocessing/K12K_math.xlsx", skip=7, n_max=70)
+```
+
+
+Plan is to later on merge `k12_elem` and `k12_jhs` again. Hence, immediate objective is to figure out weirdly named columns and make them uniform on the mentioned datasets
+
+Remove all columns that are all `NA`
+
+```{r}
+k12 <- list(k12_elem, k12_jhs, k12K)
+
+k12_wo_na_cols <-
+lapply(k12, function(x){
+  x[, colSums(is.na(x)) != nrow(x)]
+})
+#Checks that codes do the right thing
+# View(k12_jhs[,which(colSums(is.na(k12_jhs)) == nrow(k12_jhs))])
+# k12_elem[, colSums(is.na(k12_elem)) != nrow(k12_elem)]
+# 
+# lapply(k12_wo_na_cols, dim)
+
+
+```
+
+Figure out colums with weird names
+
+```{r}
+k12_elem <- k12_wo_na_cols[[1]]
+k12_jhs <- k12_wo_na_cols[[2]]
+k12_k <- k12_wo_na_cols[[3]]
+```
+
+
+```{r}
+library(magrittr)
+library(dplyr)
+
+weird_name_checker <- function(curr=k12_elem){
+  weird_index <- grep(pattern="...[0-9]+", x=colnames(curr))
+  weird_colname <- colnames(k12_elem)[weird_index]
+  apply(curr[, weird_index], 2, function(x){
+  #which.max returns index ng may highest frequency, names gives back the name!
+  names(which.max(table(x)))
+  })
+  }
+  
+View(weird_name_checker(k12_k))
+#weird_name_checker(k12_jhs)
+```
+
+
+
+
+Next is `coalesce` what should go together.
+
+```{r}
+library(doParallel)
+settle_weird_colnames <-
+function(curr_prepro="elem", this="whole") {
+  
+  if (curr_prepro == "elem") {
+    curr_wo_na = k12_elem
+  } else if (curr_prepro == "jhs") {
+    curr_wo_na = k12_jhs
+  } else if (curr_prepro == "k") {
+    curr_wo_na = k12_k
+  } else {
+    print("mali input mo")
+  }
+  
+  x<-names(table(weird_name_checker(curr_wo_na)))
+  
+  oo<-foreach(i=x, .combine=cbind) %do% {
+    k <-append(curr_wo_na[, which(colnames(curr_wo_na)==i)],
+        as.list(curr_wo_na[,names(which(weird_name_checker(curr_wo_na)==i))]))
+    k1=coalesce(!!!k) #coalesce a list of vectors
+    }
+  
+  colnames(oo) <- x
+  a<- setdiff(colnames(curr_wo_na)[-(grep(pattern = "...[0-9]+" , x = colnames(curr_wo_na)))],
+              colnames(oo))
+  b<-which(colnames(curr_wo_na)%in% a)
+    fin<-cbind(curr_wo_na[,b], oo)
+  
+  if (curr_prepro %in% c("elem", "jhs")) {
+    col_order <- union(colnames(curr_wo_na)[-(grep(pattern = "...[0-9]+" , x = colnames(curr_wo_na)))],colnames(oo))
+    fin2 <- fin[, col_order]
+  } else if (curr_prepro == "k") {
+    colnames(fin)[c(1,2,4,6)] <- c("CONTENT STANDARDS", "PERFORMANCE STANDARDS", "LEARNING COMPETENCY", "CONTENT")
+    fin2 <- fin[, c(6, 1, 2, 4, 3, 5)]
+  }
+  
+  fin3 <- anti_join(fin2, fin2[which(duplicated(fin2)),])
+  
+  #=============================================================================
+  
+  
+o=gsub("(NA)|(\r\n)|( +)", x=paste(fin3$CODE, collapse = "_"), replacement = "")
+l=paste(fin3$`LEARNING COMPETENCY`, collapse = "_")
+    
+if(curr_prepro=="elem"){
+  c_1 = stringr::str_extract_all(o, "[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-[0-9]+(\\.[0-9]+)?")[[1]]
+  } else if (curr_prepro=="jhs") {
+  c_1 = stringr::str_extract_all(o, "[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-([0-9]|[a-z])")[[1]]
+  } else if (curr_prepro=="k") {
+  c_1 = stringr::str_extract_all(o, "MK[A-Z]+(-|_00-[0-9]+")[[1]]
+  } else {
+  print('mali supplied mo')
+  }
+    
+o1<-gsub("(NA)|(\r\n)", x=l, replacement = "")
+o2<-gsub("(e\\.g\\.)|([1-9]+[0-9]*\\.[0-9]+)", x=o1, replacement = "-") 
+o3<-gsub("10\\. +10\\.", x=o2, replacement = "10\\.")
+o4<-regmatches(o3,gregexpr(text=o3, pattern = "[1-9]+[0-9]*\\.( |[a-zA-Z]).+?(_|\\.) *[a-z]*"))
+lc = sapply(o4, function(.){gsub(pattern = "_+$", x = ., replacement = "")})
+  
+  # if(curr=="elem"){
+  #   a=cbind(c_elem, lc)
+  # } else if (curr=="jhs") {
+  #   a=cbind(c_jhs, lc)
+  # } else {
+  #   print('select between "elem" and "jhs" for curr')
+  # }
+a1 <- cbind(c_1, lc)
+colnames(a1) <- c("CODE", "LEARNING COMPETENCY")
+
+if (this=="whole"){
+  return(fin3)
+} else if (this=="lc_code") {
+  return(a1)
+} else {
+  print("walang ganyang supply choice")
+}
+}
+```
+
+
+
+```{r}
+library(tibble)
+#curr=settle_weird_colnames(k12_elem)
+code_lc <- function(curr="elem"){
+  if(curr=="elem"){
+    o=gsub("(NA)|(\r\n)|( +)", x=paste(settle_weird_colnames(k12_elem)$CODE, collapse = "_"), replacement = "")
+    l=paste(settle_weird_colnames(k12_elem)$`LEARNING COMPETENCY`, collapse = "_")
+    c_elem = stringr::str_extract_all(o, "[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-[0-9]+(\\.[0-9]+)?")[[1]]
+  } else if (curr=="jhs") {
+    o=gsub("(NA)|(\r\n)|( +)", x=paste(settle_weird_colnames(k12_jhs)$CODE, collapse = "_"), replacement = "")
+    l=paste(settle_weird_colnames(k12_jhs)$`LEARNING COMPETENCY`, collapse = "_")
+    c_jhs = stringr::str_extract_all(o, "[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-([0-9]|[a-z])")[[1]]
+  } else {
+    print('select between "elem" and "jhs" for curr')
+  }
+  o1<-gsub("(NA)|(\r\n)", x=l, replacement = "")
+  o2<-gsub("(e\\.g\\.)|([1-9]+[0-9]*\\.[0-9]+)", x=o1, replacement = "-") 
+  o3<-gsub("10\\. +10\\.", x=o2, replacement = "10\\.")
+  o4<-regmatches(o3,gregexpr(text=o3, pattern = "[1-9]+[0-9]*\\.( |[a-zA-Z]).+?(_|\\.) *[a-z]*"))
+  lc = sapply(o4, function(.){gsub(pattern = "_+$", x = ., replacement = "")})
+  
+  if(curr=="elem"){
+    a=cbind(c_elem, lc)
+  } else if (curr=="jhs") {
+    a=cbind(c_jhs, lc)
+  } else {
+    print('select between "elem" and "jhs" for curr')
+  }
+  colnames(a) <- c("CODE", "LEARNING COMPETENCY")
+  return(a)
+}
+
+elem1<- as.tibble(code_lc(curr="elem"))
+hs1<- as.tibble(code_lc(curr="jhs"))
+
+elem2 <- elem1 %>% transform(Subject=substr(CODE, 1, 1),
+                             Grade=substr(CODE, 2, 2),
+                             Content=substr(CODE, 3, 4),
+                             Quarter=str_extract(CODE, pattern="[I,V]+"),
+                             what1 = str_extract(CODE, pattern="[a-z]+"),
+                             what2 = str_extract(CODE, pattern="[0-9]+(\\.[0-9])?$")
+                             )
+
+k1=paste(elem2$Subject, elem2$Grade, elem2$Content, sep="") 
+k2=paste(elem2$Quarter, sep="") #, elem2$what1, sep="") 
+PSID=paste(k1, k2, sep="-")
+
+elem3 <- cbind(elem2, PSID)
+```
+
+
+Use codes as ID
+
+```{r}
+
+elem <- at("elem", "whole")
+library(tidyr)
+a<-elem %>% filter(!is.na(`PERFORMANCE STANDARDS`) | !is.na(`CONTENT STANDARDS`)) %>%
+  select(c(CODE, `CONTENT STANDARDS`, `PERFORMANCE STANDARDS`))%>% fill(CODE)
+
+
+a1<-paste(a$CODE, collapse="")
+a1<-gsub(a1, pattern=" ", replacement="")
+a$CODE<-stringr::str_extract_all(a1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-[0-9]+(\\.[0-9]+)?")[[1]]
+
+a <- a %>% mutate(PSID=stringr::str_extract_all(a1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+")[[1]])
+View(a)
+View(left_join(elem1, a, "CODE"))
+```
+
+
+PERFORMANCE STANDARDS
+
+```{r}
+library(stringr)
+a2<-
+a %>% group_by(PSID) %>% 
+  summarise(PS =
+              gsub("(NA)|(\r\n)", x=paste(`PERFORMANCE STANDARDS`, collapse = " "),
+                   replacement = " ") %>%
+              strsplit(split = "([1-9]+[0-9]*\\.)? *is able to") %>%
+              unlist()) %>% 
+  ungroup() %>%
+  filter(PS!="")
+
+a3<-
+a %>% group_by(PSID) %>% 
+  summarise(CS =
+              gsub("(NA)|(\r\n)", x=paste(`CONTENT STANDARDS`, collapse = " "),
+                   replacement = " ") %>%
+              strsplit(split = "([1-9]+[0-9]*\\.)? *demonstrates") %>%
+              unlist()) %>% 
+  ungroup() %>%
+  filter(CS!="")
+
+
+a3_1<-a3 %>% group_by(PSID) %>% summarise(CS=paste(CS, collapse="_"))
+a2_1<-a2 %>% group_by(PSID) %>% summarise(PS=paste(PS, collapse="_"))
+
+
+elem4 <- left_join(elem3, a2_1, "PSID")
+elem4$PS[duplicated(elem4$PS)]<-NA
+elem4_1 <- left_join(elem4, a3_1, "PSID")
+elem4_1$CS[duplicated(elem4_1$CS)]<-NA
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

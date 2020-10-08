@@ -1,0 +1,36 @@
+---
+title: "To do"
+output: html_notebook
+---
+
+October 5, 2020
+
++----------------------------------------+----------------------------------------+
+| A                                      | B                                      |
++========================================+========================================+
+| Comparison                             | 1.  Comparison                         |
+|                                        |                                        |
+| -   number of competencies             | -   number of competencies             |
+|                                        |                                        |
+| -   compare MELC with K12 competencies | -   compare MELC with K12 competencies |
+|                                        |                                        |
+| -   alignment of competencies          | -   alignment of competencies          |
+|                                        |                                        |
+| -   recommendations                    | -   recommendations                    |
++----------------------------------------+----------------------------------------+
+|                                        | 2.  Unpack MELC                        |
++----------------------------------------+----------------------------------------+
+|                                        | 3.  Reverse curriculum mapping         |
++----------------------------------------+----------------------------------------+
+
+Topic calendar based on DepEd school calendar (holidays, activities)
+
+Learning standard: K-6, focused on content standards
+
+Key stage standard: K-3, 4-6, 7-10, focused on content standards
+
+Grade level standard: lahat ng ituturo for that particular grade level
+
+Content: more like mga understand...
+
+Performance
