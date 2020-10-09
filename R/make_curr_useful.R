@@ -49,7 +49,7 @@ make_curr_useful <-
                  })
     
     
-    colnames(oo) <- x
+    #colnames(oo) <- x
     a<- setdiff(colnames(processed_curr_wo_na)
                 [-(grep(pattern = "...[0-9]+" , 
                         x = colnames(processed_curr_wo_na)))],
