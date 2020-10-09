@@ -19,23 +19,34 @@ make_curr_useful <-
     # removes columns with all NA
     processed_curr_wo_na <- processed_curr[ , colSums(is.na(processed_curr)) != 
                                               nrow(processed_curr)]
-    
+  
+
+    colnames(processed_curr_wo_na) <- gsub(pattern = "\r\n",
+                                           replacement = " ",
+                                           x = colnames(processed_curr_wo_na))   ###################
+
     # index and names of all distorted columns
     weird_index <- grep(pattern="\\.\\.\\.[0-9]+", 
                         x = colnames(processed_curr_wo_na))
     weird_colname <- colnames(processed_curr_wo_na)[weird_index]
     
-    # which.max returns index ng may highest frequency, names gives back name!
-    slight_fix <- apply(processed_curr_wo_na[, weird_index], 2, function(x){
-      names(which.max(table(x)))})
-    x<-names(table(slight_fix))
+    slight_fix <-
+      apply(processed_curr_wo_na[, weird_index], 2, function(x){
+        #which.max returns index ng may highest frequency, names gives back the name!
+        name <- names(which.max(table(x))) ###############################################################
+        name <- gsub(pattern = "\r\n",
+                     replacement = " ",
+                     x = name)
+        return(name)
+      })
     
-    # oo <- foreach::foreach(i=x, .combine=cbind) %do% {
-    #   k <-append(
-    #     processed_curr_wo_na[ , which(colnames(processed_curr_wo_na)==i)],
-    #              as.list(processed_curr_wo_na[,names(which(slight_fix==i))]))
-    #   k1=dplyr::coalesce(!!!k) #coalesce a list of vectors
-    # }
+    
+    x<-names(table(slight_fix))
+
+    # # which.max returns index ng may highest frequency, names gives back name!
+    # slight_fix <- apply(processed_curr_wo_na[, weird_index], 2, function(x){
+    #   names(which.max(table(x)))})
+    # x<-names(table(slight_fix))
     
     oo <- sapply(x, 
                  function(x) {
@@ -51,7 +62,7 @@ make_curr_useful <-
     
     #colnames(oo) <- x
     a<- setdiff(colnames(processed_curr_wo_na)
-                [-(grep(pattern = "...[0-9]+" , 
+                [-(grep(pattern = "\\.\\.\\.[0-9]+" , 
                         x = colnames(processed_curr_wo_na)))],
                 colnames(oo))
     b<-which(colnames(processed_curr_wo_na)%in% a)
@@ -59,7 +70,7 @@ make_curr_useful <-
     
     if (curr %in% c("elem", "jhs")) {
       col_order <- union(colnames(
-        processed_curr_wo_na)[-(grep(pattern = "...[0-9]+" , x = 
+        processed_curr_wo_na)[-(grep(pattern = "\\.\\.\\.[0-9]+" , x = 
                                        colnames(processed_curr_wo_na)))], 
         colnames(oo))
       fin2 <- fin[, col_order]
@@ -75,22 +86,9 @@ make_curr_useful <-
     
     #===========================================================================
     
-    o=gsub("(NA)|(\r\n)|( +)", x=paste(fin3$CODE, collapse = "_"), 
-           replacement = "")
-    l=paste(fin3$`LEARNING COMPETENCY`, collapse = "_")
+    c_1<-na.omit(gsub(pattern = "( *)|(\r\n)", x=fin3$CODE, replacement=""))
     
-    if(curr=="elem"){
-      c_1 = stringr::str_extract_all(
-        o, "[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-[0-9]+(\\.[0-9]+)?")[[1]]
-    } else if (curr=="jhs") {
-      c_1 = stringr::str_extract_all(
-        o, "[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-([0-9]|[a-z])")[[1]]
-    } else if (curr=="k") {
-      c_1 = stringr::str_extract_all(
-        o, "MK[A-Z]+(-|_)00-[0-9]+")[[1]]
-    } else {
-      print('mali supplied mo')
-    }
+    l=paste(fin3$`LEARNING COMPETENCY`, collapse = "_")
     
     o1<-gsub("(NA)|(\r\n)", x=l, replacement = "")
     o2<-gsub("(e\\.g\\.)|([1-9]+[0-9]*\\.[0-9]+)", x=o1, replacement = "-") 
