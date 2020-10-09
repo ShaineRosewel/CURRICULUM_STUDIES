@@ -43,11 +43,6 @@ make_curr_useful <-
     
     x<-names(table(slight_fix))
 
-    # # which.max returns index ng may highest frequency, names gives back name!
-    # slight_fix <- apply(processed_curr_wo_na[, weird_index], 2, function(x){
-    #   names(which.max(table(x)))})
-    # x<-names(table(slight_fix))
-    
     oo <- sapply(x, 
                  function(x) {
                    k <-append(
@@ -60,7 +55,6 @@ make_curr_useful <-
                  })
     
     
-    #colnames(oo) <- x
     a<- setdiff(colnames(processed_curr_wo_na)
                 [-(grep(pattern = "\\.\\.\\.[0-9]+" , 
                         x = colnames(processed_curr_wo_na)))],
@@ -92,7 +86,6 @@ make_curr_useful <-
     l =ifelse(grepl("^[0-9]", omitted_na), 
               paste0("starthere", omitted_na), omitted_na) 
     l = paste(l, collapse=" ") %>% gsub(pattern="\r\n", replacement=" ")
-    library(magrittr)
     
     lc <- strsplit(l, split = "starthere")[[1]][-1]
     
@@ -117,30 +110,17 @@ make_curr_useful <-
   
       # cleaning performance and content standards =============================
       
-      b<-fin3 %>% 
+      b0<-fin3 %>% 
         dplyr::filter(!is.na(
           `PERFORMANCE STANDARDS`) | !is.na(`CONTENT STANDARDS`)) %>%
         dplyr::select(c(CODE, `CONTENT STANDARDS`, `PERFORMANCE STANDARDS`))%>% 
         tidyr::fill(CODE)
       
-      b1<-paste(b$CODE, collapse="")
-      b1<-gsub(b1, pattern=" ", replacement="")
+      b1<-na.omit(gsub(pattern = "( *)|(\r\n)", x=b0$CODE, replacement=""))
       
-      if(curr == "elem"){
-        b$CODE <- stringr::str_extract_all(
-          b1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-[0-9]+(\\.[0-9]+)?")[[1]]
-        b <- b %>% 
-          dplyr::mutate(PSID=stringr::str_extract_all(
-            b1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+")[[1]])
-      } else if (curr=="jhs") {
-        b$CODE <- stringr::str_extract_all(
-          b1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+[a-z]-([0-9]|[a-z])")[[1]]
-        b <- b %>% 
-          dplyr::mutate(PSID=stringr::str_extract_all(
-            b1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+")[[1]])
-      } else {
-        print('mali supplied mo')
-      }
+      b <- b0 %>% 
+        dplyr::mutate(PSID=stringr::str_extract_all(
+          b1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+")[[1]])
       
       # CS ---------------------------------------------------------------------
       
