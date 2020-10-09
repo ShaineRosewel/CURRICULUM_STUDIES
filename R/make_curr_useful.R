@@ -1,6 +1,5 @@
 make_curr_useful <-
   function(curr = "elem", this = "whole") {
-    library(doParallel)
     library(magrittr)
     
     # get relevant data
@@ -30,12 +29,24 @@ make_curr_useful <-
       names(which.max(table(x)))})
     x<-names(table(slight_fix))
     
-    oo <- foreach::foreach(i=x, .combine=cbind) %do% {
-      k <-append(
-        processed_curr_wo_na[ , which(colnames(processed_curr_wo_na)==i)],
-                 as.list(processed_curr_wo_na[,names(which(slight_fix==i))]))
-      k1=dplyr::coalesce(!!!k) #coalesce a list of vectors
-    }
+    # oo <- foreach::foreach(i=x, .combine=cbind) %do% {
+    #   k <-append(
+    #     processed_curr_wo_na[ , which(colnames(processed_curr_wo_na)==i)],
+    #              as.list(processed_curr_wo_na[,names(which(slight_fix==i))]))
+    #   k1=dplyr::coalesce(!!!k) #coalesce a list of vectors
+    # }
+    
+    oo <- sapply(x, 
+                 function(x) {
+                   k <-append(
+                     processed_curr_wo_na[ ,
+                                           which(colnames(
+                                             processed_curr_wo_na)==x)],
+                     as.list(
+                       processed_curr_wo_na[ ,names(which(slight_fix==x))]))
+                   k1=dplyr::coalesce(!!!k)
+                 })
+    
     
     colnames(oo) <- x
     a<- setdiff(colnames(processed_curr_wo_na)
