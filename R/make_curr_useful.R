@@ -1,5 +1,5 @@
 make_curr_useful <-
-  function(curr = "elem", this = "whole") {
+  function(curr = "elem") {
     library(magrittr)
     
     # get relevant data
@@ -16,16 +16,13 @@ make_curr_useful <-
       print("wala sa choices yan - k, elem, jhs lang")
     }
     
-    # removes columns with all NA
     processed_curr_wo_na <- processed_curr[ , colSums(is.na(processed_curr)) != 
                                               nrow(processed_curr)]
   
-
     colnames(processed_curr_wo_na) <- gsub(pattern = "\r\n",
                                            replacement = " ",
-                                           x = colnames(processed_curr_wo_na))   ###################
+                                           x = colnames(processed_curr_wo_na))
 
-    # index and names of all distorted columns
     weird_index <- grep(pattern="\\.\\.\\.[0-9]+", 
                         x = colnames(processed_curr_wo_na))
     weird_colname <- colnames(processed_curr_wo_na)[weird_index]
@@ -33,13 +30,12 @@ make_curr_useful <-
     slight_fix <-
       apply(processed_curr_wo_na[, weird_index], 2, function(x){
         #which.max returns index ng may highest frequency, names gives back the name!
-        name <- names(which.max(table(x))) ###############################################################
+        name <- names(which.max(table(x)))
         name <- gsub(pattern = "\r\n",
                      replacement = " ",
                      x = name)
         return(name)
       })
-    
     
     x<-names(table(slight_fix))
 
@@ -98,19 +94,15 @@ make_curr_useful <-
                   GRADE = stringr::str_extract(CODE, pattern="[0-9]+"),
                   CONTENT = stringr::str_extract(CODE, pattern="([A-Z]+){2}"),
                   QUARTER = stringr::str_extract(CODE, 
-                                                 pattern="([IV]+)|((0+){2})")#,
-                  #what1 = stringr::str_extract(CODE, pattern="[a-z]+"),
-                  #what2 = 
-                  #stringr::str_extract(CODE, pattern="[0-9]+(\\.[0-9])?$")
+                                                 pattern="([IV]+)|((0+){2})")
       )
+      
       a3=paste(a2$SUBJECT, a2$GRADE, a2$CONTENT, sep="") 
-      a4=paste(a2$QUARTER, sep="") #, elem2$what1, sep="") 
+      a4=paste(a2$QUARTER, sep="") 
       PSID=paste(a3, a4, sep="-")
       a5 <- cbind(a2, PSID)
-  
-      # cleaning performance and content standards =============================
       
-      b0<-fin3 %>% 
+      b0<-fin3 %>% # prep for content, perf stand
         dplyr::filter(!is.na(
           `PERFORMANCE STANDARDS`) | !is.na(`CONTENT STANDARDS`)) %>%
         dplyr::select(c(CODE, `CONTENT STANDARDS`, `PERFORMANCE STANDARDS`))%>% 
@@ -120,49 +112,27 @@ make_curr_useful <-
       
       b <- b0 %>% 
         dplyr::mutate(PSID=stringr::str_extract_all(
-          b1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+")[[1]])
+          b1, pattern="[A-Z][0-9]+[A-Z]+-[I,V]+"))
+      b$PSID <- unlist(b$PSID)
       
-      # CS ---------------------------------------------------------------------
+      csp<-  # content performance standard
+        apply(b[, 2:3], 2, function(x){
+          aggregate(x,
+                    list(factor(b$PSID)),
+                    paste, collapse=" ")
+        })
       
-      cs <- b %>% dplyr::group_by(PSID) %>% 
-        dplyr::summarise(CS = gsub("(NA)|(\r\n)", 
-                                   x = paste(`CONTENT STANDARDS`,
-                                           collapse = " "),
-                                   replacement = " ") %>%
-                           strsplit(split = 
-                                      "([1-9]+[0-9]*\\.)? *demonstrates") %>%
-                           unlist()) %>%
-        dplyr::ungroup() %>%
-        dplyr::filter(CS!="")
+      csp<-cbind(csp[[1]], csp[[2]][,2])
+      colnames(csp) <- c("PSID", "CS", "PS")
+      csp$PS <- gsub(pattern = "is able to", x = csp$PS, replacement = "")
       
-      # PS ---------------------------------------------------------------------
+      yy<-dplyr::left_join(a5, csp, by="PSID")
+      yy$CS[duplicated(yy$CS)] <- NA
+      yy$PS[duplicated(yy$PS)] <- NA
       
-      ps <- b %>% dplyr::group_by(PSID) %>% 
-        dplyr::summarise(PS = gsub("(NA)|(\r\n)",
-                                   x=paste(`PERFORMANCE STANDARDS`, 
-                                           collapse = " "),
-                                   replacement = " ") %>%
-                           strsplit(split = 
-                                      "([1-9]+[0-9]*\\.)? *is able to") %>%
-                           unlist()) %>%
-        dplyr::ungroup() %>%
-        dplyr::filter(PS!="")
-      
-      # ------------------------------------------------------------------------
-      
-      cs_1 <- cs %>% dplyr::group_by(PSID) %>% 
-        dplyr::summarise(CS=paste(CS, collapse="_"))
-      ps_1 <- ps %>% dplyr::group_by(PSID) %>% 
-        dplyr::summarise(PS=paste(PS, collapse="_"))
-      
-      a6 <- dplyr::left_join(a5, cs_1, "PSID")
-      a6$CS[duplicated(a6$CS)] <- NA
-      
-      a7 <- dplyr::left_join(a6, ps_1, "PSID")
-      a7$PS[duplicated(a7$PS)] <- NA
-      a7$CONTENT <- factor(a7$CONTENT)
-      a7$QUARTER <- factor(a7$QUARTER)
-      levels(a7$QUARTER) <- c("1", "2", "3", "4")
+      yy[, c("CONTENT", "QUARTER")] <- lapply(yy[, c("CONTENT", "QUARTER")], 
+                                              factor)
+      levels(yy$QUARTER) <- c("1", "2", "3", "4")
       
     } else if (curr=="k") {
       a2 <- tibble::as.tibble(a1) %>% 
@@ -173,25 +143,22 @@ make_curr_useful <-
                               rep("Measurement (ME)", 10), 
                               rep("Geometry (G)", 5), 
                               rep("Statistics and Probability (SP)", 4)),
-                  #unknown = stringr::str_extract(
-                  #CODE, pattern="(?<=MK).*?(?=-|_)"),
-                  QUARTER = stringr::str_extract(CODE, pattern="00")#,
-                  #what1 = stringr::str_extract(CODE, pattern="[0-9]+$")
+                  QUARTER = stringr::str_extract(CODE, pattern="00")
       )
       
-      a7 <- dplyr::left_join(a2, fin3[, 1:3], "CONTENT")
+      yy <- dplyr::left_join(a2, fin3[, 1:3], "CONTENT")
       colnames(a7)[7:8] <- c("CS", "PS")
-      a7$PS[duplicated(a7$PS)] <- NA
-      a7$CS[duplicated(a7$CS)] <- NA
+      yy$PS[duplicated(yy$PS)] <- NA
+      yy$CS[duplicated(yy$CS)] <- NA
       
-      a7$CONTENT <- factor(a7$CONTENT)
-      levels(a7$CONTENT)<-c("GE", "LG", "ME", "NS", "SP")
-      a7$GRADE <- 0
-      a7$QUARTER <- factor(0)
+      yy$CONTENT <- factor(yy$CONTENT)
+      levels(yy$CONTENT)<-c("GE", "LG", "ME", "NS", "SP")
+      yy$GRADE <- 0
+      yy$QUARTER <- factor(0)
       #a7$CONTENT <- as.character(a7$CONTENT)
     }
     
-    a8 <- a7 %>% tidyr::separate(col = LEARNING.COMPETENCY, 
+    a8 <- yy %>% tidyr::separate(col = LEARNING.COMPETENCY, 
                                  into = c("NUMBER", "LC"), 
                                  sep = "\\.", 
                                  extra = "merge")
@@ -214,24 +181,11 @@ make_curr_useful <-
     
     OURCODE = paste0(a8$SUBJECT, a8$GRADE, a8$CONTENT, a8$QUARTER, a8$NUMBER)
     a9 <- cbind(CODE=a8[,"CODE"], OURCODE, a8[, c("CS", "PS", "LC")])
-    
-    # output====================================================================
-    
-    if (this=="whole"){
-      return(fin3)
-    } else if (this=="prt") {
-      return(a8)
-    } else if (this=="spread") {
-      return(a9)
-    } else {
-      print("walang ganyang supply choice")
     }
-  }
 
 # sample usage -----------------------------------------------------------------
-K <- make_curr_useful("k", "spread")
-E <- make_curr_useful("elem", "spread")
-J <- make_curr_useful("jhs", "spread")
-
+K <- make_curr_useful("k")
+E <- make_curr_useful("elem")
+J <- make_curr_useful("jhs")
 
 full <- rbind(K, E, J)
