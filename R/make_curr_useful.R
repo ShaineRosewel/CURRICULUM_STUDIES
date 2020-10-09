@@ -88,18 +88,16 @@ make_curr_useful <-
     
     c_1<-na.omit(gsub(pattern = "( *)|(\r\n)", x=fin3$CODE, replacement=""))
     
-    l=paste(fin3$`LEARNING COMPETENCY`, collapse = "_")
+    omitted_na <- na.omit(fin3$`LEARNING COMPETENCY`)
+    l =ifelse(grepl("^[0-9]", omitted_na), 
+              paste0("starthere", omitted_na), omitted_na) 
+    l = paste(l, collapse=" ") %>% gsub(pattern="\r\n", replacement=" ")
+    library(magrittr)
     
-    o1<-gsub("(NA)|(\r\n)", x=l, replacement = "")
-    o2<-gsub("(e\\.g\\.)|([1-9]+[0-9]*\\.[0-9]+)", x=o1, replacement = "-") 
-    o3<-gsub("10\\. +10\\.", x=o2, replacement = "10\\.")
-    o4<-regmatches(o3,gregexpr(
-      text = o3, pattern = "[1-9]+[0-9]*\\.( |[a-zA-Z]).+?(_|\\.) *[a-z]*"))
-    lc = sapply(o4, function(.){gsub(pattern = "_+$", x = ., replacement = "")})
+    lc <- strsplit(l, split = "starthere")[[1]][-1]
     
     a1 <- cbind(c_1, lc)
     colnames(a1) <- c("CODE", "LEARNING COMPETENCY")
-    
     
     if(curr %in% c("elem", "jhs")){
       a2 <- tibble::as.tibble(a1) %>% 
