@@ -21,7 +21,8 @@ make_curr_useful <-
                                               nrow(processed_curr)]
     
     # index and names of all distorted columns
-    weird_index <- grep(pattern="...[0-9]+", x=colnames(processed_curr_wo_na))
+    weird_index <- grep(pattern="\\.\\.\\.[0-9]+", 
+                        x = colnames(processed_curr_wo_na))
     weird_colname <- colnames(processed_curr_wo_na)[weird_index]
     
     # which.max returns index ng may highest frequency, names gives back name!
