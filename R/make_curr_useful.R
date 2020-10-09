@@ -2,7 +2,6 @@ make_curr_useful <-
   function(curr = "elem") {
     library(magrittr)
     
-    # get relevant data
     if (curr=="elem"){
       processed_curr<-readxl::read_xlsx("input/K12_math.xlsx", 
                                         skip=3, n_max=1102, col_names = TRUE)
@@ -12,8 +11,6 @@ make_curr_useful <-
     } else if (curr=="k") {
       processed_curr<-readxl::read_xlsx("input/K12K_math.xlsx", skip=7, 
                                         n_max=70)
-    } else {
-      print("wala sa choices yan - k, elem, jhs lang")
     }
     
     processed_curr_wo_na <- processed_curr[ , colSums(is.na(processed_curr)) != 
@@ -147,7 +144,7 @@ make_curr_useful <-
       )
       
       yy <- dplyr::left_join(a2, fin3[, 1:3], "CONTENT")
-      colnames(a7)[7:8] <- c("CS", "PS")
+      colnames(yy)[7:8] <- c("CS", "PS")
       yy$PS[duplicated(yy$PS)] <- NA
       yy$CS[duplicated(yy$CS)] <- NA
       
@@ -177,7 +174,6 @@ make_curr_useful <-
                            width=3,
                            format = "d")
     } 
-    
     
     OURCODE = paste0(a8$SUBJECT, a8$GRADE, a8$CONTENT, a8$QUARTER, a8$NUMBER)
     a9 <- cbind(CODE=a8[,"CODE"], OURCODE, a8[, c("CS", "PS", "LC")])
