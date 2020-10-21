@@ -1,18 +1,20 @@
 ---
 title: "Initial Insights"
-author: Shaine Rosewel P. Matala
-output: 
+author: "Shaine Rosewel P. Matala"
+output:
+  html_document:
+    df_print: paged
   html_notebook:
     df_print: paged
+    theme: united
 ---
 
 ```{r echo = FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(readxl)
 ```
 
-## The Curriculums
-
-Here are the column names for your reference: `r colnames(init_01)`
+## Full K12 and MELC Curriculum
 
 ```{r}
 # get ll relevant sheets
@@ -25,25 +27,84 @@ lapply(2:12, function(.){
 init_01 <- do.call("rbind", sheet.all)
 
 # remove extra white spaces within
-init_01 <- as.data.frame(apply(init_01, 2, stringr::str_squish))
-init_01
+init_01 <- as.data.frame(apply(init_01, 2, stringr::str_squish), row.names = FALSE)
+
+d <- init_01[!is.na(init_01$MELC_LC),]
+d <- tidyr::fill(d, c(QUARTER, WEEK))
+
+init_01 <- dplyr::left_join(x = init_01[,1:6], y = d[, 6:10], by = "MELC_CODE")
 ```
 
 
+Filter as you wish: Below is a reference of the possible values for "filterable-by-logic" columns
 
-## Duplicates
-
-There is one `K12_LC` in the K12 curriculum that is duplicated. Notice that the codes are different as well. Click the right arrow to see that this was somehow addressed in the MELC by writing a new `MELC_LC`.
+* `GRADE`: `r levels(factor(init_01$GRADE))`
+* `CONTENT/STRAND`: `r levels(factor(init_01$"CONTENT/STRAND"))`
 
 ```{r}
-dplyr::filter(init_01, K12_LC %in% init_01$K12_LC[which(duplicated(init_01$K12_LC))])[11:12,3:6]
+library(DT)
+library(rio)
+datatable(init_01[, 1:6], rownames = FALSE, filter = 'top')
 ```
+The question we are dying to address: Was there really a reduction in the number of learning competencies? Let us have a real quick view.
 
-In the manual checking of MELC, one `MELC_LC` was observed to be duplicated as it appears in two different quarters
+
+
+## Problems to begin with
+
+There is one `K12_LC` in the K12 curriculum that is duplicated. Notice that they are differently coded, too. (hit the right arrow to see)
 
 ```{r}
-init_01[which(nchar(init_01$QUARTER) > 2), 5:8]
+dat <- dplyr::filter(init_01, K12_LC %in% init_01$K12_LC[which(duplicated(init_01$K12_LC))])[11:12,3:4]
+rownames(dat) <- NULL
+dat
 ```
 
+This was actually addressed in MELC by writing a `MELC_LC`, which I coded as `NEW` just because I am not sure to which it is exactly is equivalent to in the K12 curriculum.
 
+```{r}
+dat <- dplyr::filter(init_01, K12_LC %in% init_01$K12_LC[which(duplicated(init_01$K12_LC))])[11,5:6]
+rownames(dat) <- NULL
+dat
+```
+
+In the manual checking of MELC, one `MELC_LC` was observed to be duplicated as it appears in two different quarters. Not sure if DepEd really wants it this way.
+
+```{r}
+dat <- init_01[which(nchar(init_01$QUARTER) > 2), 5:8]
+rownames(dat) <- NULL
+dat
+```
+
+## Changes as they say
+
+What I did is to compare the competencies from the K12 curriculum to those in the MELC curriculum and to indicate in the `MELC_CODE` which `K12_CODES` were merged to form the new `MELC_LC` `_` (underscore) was used to separate these merged `K12_CODE`. The worst case is that 6 `K12_CODE`s were all combined into one `MELC_LC`. This is not simply merging, in defense to DepEd. What they did is 
+
+1. reduce verbs  
+    ex: "visualizes, represents, and compares" changed to "compares"
+2. separated but related competencies were combined in one grand competency  
+    ex: M1NS-IIa-26.1_M1NS-IIa-28.1a_M1NS-IIb-26.2_M1NS-IIb-27.1_M1NS-IIc-27.2_M1NS-IIc-27.3
+    
+> add some more
+
+```{r}
+new.or.merged.melc <- init_01$MELC_CODE[grep(pattern = "(.+_.+)|(NEW)", x = init_01$MELC_CODE)]
+data.frame(new.or.merged.melc)
+```
+
+Feel free to explore below the reduction that we are being told about. This shows the merging.
+
+```{r}
+merged.melc <- init_01$MELC_CODE[grep(pattern = ".+_.+", x = init_01$MELC_CODE)]
+MELC2 <- unlist(strsplit(merged.melc, split = "_"))
+merged.melc.huh <- dplyr::filter(init_01, K12_CODE %in% MELC2)[,c(1, 3:6)]
+datatable(merged.melc.huh, rownames = FALSE, filter = 'top')
+```
+
+This shows the newly stated `MELC_LC`. I coded these as `NEW` because DepEd did not code them with a `K12_CODE` and so I assume that these are either 1. new competencies or 2. a mix of many `K12_LC`s. However, I can't exactly point out which ones were merged. It appears that 2nd there could be coded similarly to how it was in `K12_CODE`. I am not sure tho because DepEd only used `K12_CODE` for exact matches only.
+
+```{r}
+new.melc <- which(init_01$MELC_CODE == "NEW")
+datatable(init_01[new.melc,3:6], options = list(paging = FALSE), rownames = NULL)
+```
 
