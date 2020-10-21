@@ -1,0 +1,49 @@
+---
+title: "Initial Insights"
+author: Shaine Rosewel P. Matala
+output: 
+  html_notebook:
+    df_print: paged
+---
+
+```{r echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## The Curriculums
+
+Here are the column names for your reference: `r colnames(init_01)`
+
+```{r}
+# get ll relevant sheets
+sheet.all <- 
+lapply(2:12, function(.){
+  read_xlsx("INIT_01.xlsx", sheet = ., trim_ws = TRUE, range = cell_cols("A:J"))
+})
+
+# gather all sheets into one dataframe
+init_01 <- do.call("rbind", sheet.all)
+
+# remove extra white spaces within
+init_01 <- as.data.frame(apply(init_01, 2, stringr::str_squish))
+init_01
+```
+
+
+
+## Duplicates
+
+There is one `K12_LC` in the K12 curriculum that is duplicated. Notice that the codes are different as well. Click the right arrow to see that this was somehow addressed in the MELC by writing a new `MELC_LC`.
+
+```{r}
+dplyr::filter(init_01, K12_LC %in% init_01$K12_LC[which(duplicated(init_01$K12_LC))])[11:12,3:6]
+```
+
+In the manual checking of MELC, one `MELC_LC` was observed to be duplicated as it appears in two different quarters
+
+```{r}
+init_01[which(nchar(init_01$QUARTER) > 2), 5:8]
+```
+
+
+
