@@ -1,15 +1,15 @@
 make_curr_useful <-
-  function(curr = "elem") {
+  function(curr = "elem", path="C:/Users/shain/Desktop/CURRICULUM_STUDIES/input/K12_math.xlsx") {
     library(magrittr)
     
     if (curr=="elem"){
-      processed_curr<-readxl::read_xlsx("C:/Users/shain/Desktop/CURRICULUM_STUDIES/input/K12_math.xlsx", 
+      processed_curr<-readxl::read_xlsx(path, 
                                         skip=3, n_max=1102, col_names = TRUE)
     } else if (curr=="jhs") {
-      processed_curr<-readxl::read_xlsx("C:/Users/shain/Desktop/CURRICULUM_STUDIES/input/K12_math.xlsx", 
+      processed_curr<-readxl::read_xlsx(path, 
                                         skip=1107, col_names = TRUE)
     } else if (curr=="k") {
-      processed_curr<-readxl::read_xlsx("C:/Users/shain/Desktop/CURRICULUM_STUDIES/input/K12K_math.xlsx", skip=7, 
+      processed_curr<-readxl::read_xlsx(path, skip=7, 
                                         n_max=70)
     }
     
