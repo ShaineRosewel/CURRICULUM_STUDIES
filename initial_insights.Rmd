@@ -1,20 +1,24 @@
 ---
-title: "Initial Insights"
+title: "K-12 to MELCs Curriculum"
+subtitle: "Initial Insights"
 author: "Shaine Rosewel P. Matala"
 output:
   html_document:
     df_print: paged
+    theme: united
+    toc: true
+    toc_folding: yes
   html_notebook:
     df_print: paged
     theme: united
 ---
 
-```{r echo = FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+```{r echo = FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.align = "center", fig.width=6, fig.height=6)
 library(readxl)
+library(dplyr)
+library(magrittr)
 ```
-
-## Full K12 and MELC Curriculum
 
 ```{r}
 # get ll relevant sheets
@@ -28,19 +32,59 @@ init_01 <- do.call("rbind", sheet.all)
 
 # remove extra white spaces within
 init_01 <- as.data.frame(apply(init_01, 2, stringr::str_squish), row.names = FALSE)
-
-d <- init_01[!is.na(init_01$MELC_LC),]
-d <- tidyr::fill(d, c(QUARTER, WEEK))
-
-init_01 <- dplyr::left_join(x = init_01[,1:6], y = d[, 6:10], by = "MELC_CODE")
 ```
 
+## At a Glance
 
-Filter as you wish: Below is a reference of the possible values for "filterable-by-logic" columns
+```{r tidy the data}
+library(dplyr)
+tidy.1 <- init_01[!is.na(init_01$MELC_LC),]
+tidy.2 <- tidyr::fill(tidy.1, c(QUARTER, WEEK))
+CURRICULUM <- rep("MELC", nrow(tidy.2))
+curr.1 <- cbind( CURRICULUM, tidy.2[,c(1,2,5:6)])
+colnames(curr.1)[4:5] <- c("LC", "CODE")
 
-* `GRADE`: `r levels(factor(init_01$GRADE))`
-* `CONTENT/STRAND`: `r levels(factor(init_01$"CONTENT/STRAND"))`
+CURRICULUM <- rep("K12", nrow(init_01))
+curr.2 <- cbind(CURRICULUM, init_01[,c(1,2,3,4)])
+colnames(curr.2)[4:5] <- c("LC", "CODE")
 
+curr <- rbind(curr.2, curr.1)
+curr[,1:3] <- lapply(curr[,1:3], as.factor)
+```
+
+At first glance, it is easy to say that the K-12 curriculum has been trimmed down. The question of whether the reduction is meaningful and significant is yet to be answered. By observation, the difference in the number of learning competencies from Kinder to Grade 6 are generally higher than from those that remain (high school, in particular). Note that for plotting, DepEd provided codes were used as bases.
+
+```{r prelim plot1, fig.width=8, fig.align = "center"}
+curr.3 <- curr %>% dplyr::group_by(CURRICULUM, GRADE) %>% tally()
+library(ggplot2)
+ggplot(curr.3, aes(x = GRADE, y = n, fill = CURRICULUM)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label=n), position=position_dodge(width=0.9), vjust=-0.5) +
+  ggtitle("Number of Math Competencies Per Grade") +
+  scale_x_discrete(labels=c("K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10")) +
+  xlab("Grade") +
+  ylab(NULL) +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) 
+```
+
+The curriculum is supposed to be spiral. In our context, this is how spiraling looks like, according to DepEd. The question is, is it supposed to be really like this? Guided by the principles and theories in education, do these panels suggest that we have a nicely  weaved curriculum? Where is Stats and Prob in grades 8 and 9 when it is present in grades 7 and 10? Are we not mistaken? Is there really a gap? (In fact there is an error in the codes presented by DepEd. Read further ([Wrong codes] section) to see. Grade 8 has stats and prob. But still, grade 9 manifests the gap.)
+
+```{r prelim plot2, fig.width=8, fig.align = "center"}
+curr.3 <- curr %>% dplyr::group_by(CURRICULUM, GRADE, `CONTENT/STRAND`) %>% tally()# %>% filter(GRADE %in% c("00", "01", "02", "03", "04", "05", "06"))
+curr.3$`CONTENT/STRAND` <- factor(curr.3$`CONTENT/STRAND`, levels=c("LG", "SP", "ME", "AL", "GE", "NS"))
+ggplot(curr.3, aes(x = GRADE, y =as.numeric(n), fill=`CONTENT/STRAND`)) +
+  geom_col(position = "fill") +
+  scale_fill_brewer(type = "qual", palette = "Set1")+
+  ggtitle("How Content Progresses From K-10") +
+  xlab(NULL) +
+  ylab(NULL) +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  facet_grid(rows=vars(CURRICULUM)) +
+  scale_x_discrete(labels=c("K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10")) 
+ #theme(legend.position="bottom")
+```
 ```{r}
 library(DT)
 library(rio)
@@ -49,8 +93,9 @@ datatable(init_01[, 1:6], rownames = FALSE, filter = 'top')
 The question we are dying to address: Was there really a reduction in the number of learning competencies? Let us have a real quick view.
 
 
-
 ## Problems to begin with
+
+### Duplicated LC
 
 There is one `K12_LC` in the K12 curriculum that is duplicated. Notice that they are differently coded, too. (hit the right arrow to see)
 
@@ -68,6 +113,18 @@ rownames(dat) <- NULL
 dat
 ```
 
+### Duplicated CODES
+
+<span style="color: red;"> UPDATE (12-15-2020): More duplicated codes found in K12 Kinder. </span>
+
+```{r}
+dat <- dplyr::filter(init_01, K12_CODE %in% init_01$K12_CODE[which(duplicated(init_01$K12_CODE))])
+rownames(dat) <- NULL
+dat
+```
+
+
+
 In the manual checking of MELC, one `MELC_LC` was observed to be duplicated as it appears in two different quarters. Not sure if DepEd really wants it this way.
 
 ```{r}
@@ -75,6 +132,17 @@ dat <- init_01[which(nchar(init_01$QUARTER) > 2), 5:8]
 rownames(dat) <- NULL
 dat
 ```
+
+### Wrong codes
+
+One strand in G8 is wrongly coded. It would appear that the codes are not 100% reliable. This error has been radiated to MELC as well. My wish is that for DepEd to be transparent on the information on how the codes were assigned by providing a short discussion about it within the curriculum, so that the meanings will make sense and allow errors such as this to be reported ASAP by curriculum users.
+
+```{r}
+prob <- (init_01 %>% filter(GRADE == "08", `CONTENT/STRAND`=="GE"))[20:24,3:6]
+rownames(prob) <- NULL
+prob
+```
+
 
 ## Changes as they say
 
